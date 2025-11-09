@@ -1,0 +1,774 @@
+openapi: 3.1.0
+info:
+  title: Mini CRM Backend API
+  version: "1.1.0"
+  description: |
+    RESTful API for the Mini CRM backend built on Laravel 12 with Laravel Sanctum authentication,
+    multi-role access control, event-driven updates, queued notifications, and cached dashboard metrics.
+    
+    **Recent Updates (v1.1):**
+    - Migrated from Passport to Sanctum for simpler token authentication
+    - Added company field to clients
+    - Enhanced client status logic (3+ communications in 7 days = Hot)
+    - Added top 5 sales reps to dashboard
+    - Added average communication frequency metric
+servers:
+  - url: https://api.example.com
+    description: Production server
+  - url: http://localhost
+    description: Local development server (remember to prefix endpoints with /api/v1)
+tags:
+  - name: Authentication
+  - name: Clients
+  - name: Communications
+  - name: Follow Ups
+  - name: Dashboard
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Issue a Sanctum access token using email and password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@crm.com
+                password:
+                  type: string
+                  format: password
+                  example: password
+      responses:
+        '200':
+          description: Successful authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke the currently authenticated user's token.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /api/v1/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Fetch the authenticated user profile.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+  /api/v1/clients:
+    get:
+      tags: [Clients]
+      summary: List clients visible to the current user.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [hot, warm, inactive]
+          description: Optional status filter
+      responses:
+        '200':
+          description: Paginated client list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedClientResponse'
+    post:
+      tags: [Clients]
+      summary: Create a new client.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientInput'
+      responses:
+        '201':
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+  /api/v1/clients/{client}:
+    parameters:
+      - name: client
+        in: path
+        required: true
+        schema:
+          type: string
+        description: UUID or numeric identifier of the client
+    get:
+      tags: [Clients]
+      summary: Retrieve a client by ID.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Client resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+    put:
+      tags: [Clients]
+      summary: Update a client.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientInput'
+      responses:
+        '200':
+          description: Client updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+    delete:
+      tags: [Clients]
+      summary: Delete a client.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Client deleted
+  /api/v1/clients/{client}/communications:
+    get:
+      tags: [Communications]
+      summary: List communications for a client.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: client
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [call, email, meeting]
+      responses:
+        '200':
+          description: Paginated communication list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCommunicationResponse'
+    post:
+      tags: [Communications]
+      summary: Record a new communication for a client.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunicationInput'
+      responses:
+        '201':
+          description: Communication created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunicationResponse'
+  /api/v1/clients/{client}/communications/{communication}:
+    parameters:
+      - name: client
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: communication
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Communications]
+      summary: Retrieve a communication record.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Communication resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunicationResponse'
+    put:
+      tags: [Communications]
+      summary: Update a communication record.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunicationInput'
+      responses:
+        '200':
+          description: Communication updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunicationResponse'
+    delete:
+      tags: [Communications]
+      summary: Delete a communication record.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Communication deleted
+  /api/v1/clients/{client}/follow-ups:
+    get:
+      tags: [Follow Ups]
+      summary: List follow-ups for a client with optional filters.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: client
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, completed]
+        - name: due_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: due_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Paginated follow-up list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFollowUpResponse'
+    post:
+      tags: [Follow Ups]
+      summary: Create a follow-up task for a client.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FollowUpInput'
+      responses:
+        '201':
+          description: Follow-up created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowUpResponse'
+  /api/v1/clients/{client}/follow-ups/{follow_up}:
+    parameters:
+      - name: client
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: follow_up
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Follow Ups]
+      summary: View a follow-up task.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Follow-up resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowUpResponse'
+    put:
+      tags: [Follow Ups]
+      summary: Update a follow-up task.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FollowUpInput'
+      responses:
+        '200':
+          description: Follow-up updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowUpResponse'
+    delete:
+      tags: [Follow Ups]
+      summary: Delete a follow-up task.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Follow-up deleted
+  /api/v1/dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Retrieve cached dashboard metrics for the authenticated user.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Dashboard metrics payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Laravel Sanctum token authentication. 
+        Obtain a token via POST /api/v1/auth/login.
+        
+        **Token Abilities:**
+        - `*`: Full access (admin only)
+        - `clients:read`: View client records and communications
+        - `clients:write`: Create or update client records
+        - `communications:create`: Log communications
+        - `followups:manage`: Manage follow-up tasks
+        - `dashboard:view`: View dashboard analytics
+  schemas:
+    BasicResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Logged out
+        data:
+          nullable: true
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Invalid credentials
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    TokenResponse:
+      allOf:
+        - $ref: '#/components/schemas/BasicResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                token_type:
+                  type: string
+                  example: Bearer
+                access_token:
+                  type: string
+                expires_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                scopes:
+                  type: array
+                  items:
+                    type: string
+                user:
+                  $ref: '#/components/schemas/User'
+    UserResponse:
+      allOf:
+        - $ref: '#/components/schemas/BasicResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                user:
+                  $ref: '#/components/schemas/User'
+    ClientResponse:
+      allOf:
+        - $ref: '#/components/schemas/BasicResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Client'
+    CommunicationResponse:
+      allOf:
+        - $ref: '#/components/schemas/BasicResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Communication'
+    FollowUpResponse:
+      allOf:
+        - $ref: '#/components/schemas/BasicResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/FollowUp'
+    PaginatedClientResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginatedResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Client'
+                meta:
+                  $ref: '#/components/schemas/PaginationMeta'
+    PaginatedCommunicationResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginatedResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Communication'
+                meta:
+                  $ref: '#/components/schemas/PaginationMeta'
+    PaginatedFollowUpResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginatedResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FollowUp'
+                meta:
+                  $ref: '#/components/schemas/PaginationMeta'
+    PaginatedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: OK
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+        last_page:
+          type: integer
+    Client:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        company:
+          type: string
+          nullable: true
+          description: Company name (added in v1.1)
+        status:
+          type: string
+          enum: [hot, warm, inactive]
+        assigned_to:
+          type: integer
+          nullable: true
+        last_communication_date:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ClientInput:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        company:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [hot, warm, inactive]
+        assigned_to:
+          type: integer
+          nullable: true
+      required: [name, email]
+    Communication:
+      type: object
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        type:
+          type: string
+          enum: [call, email, meeting]
+        date:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+        created_by:
+          type: integer
+        creator:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CommunicationInput:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [call, email, meeting]
+        date:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+      required: [type, date]
+    FollowUp:
+      type: object
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        user_id:
+          type: integer
+        due_date:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, completed]
+        owner:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    FollowUpInput:
+      type: object
+      properties:
+        due_date:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, completed]
+        user_id:
+          type: integer
+          nullable: true
+      required: [due_date]
+    DashboardResponse:
+      allOf:
+        - $ref: '#/components/schemas/BasicResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                totals:
+                  type: object
+                  properties:
+                    clients:
+                      type: integer
+                    follow_ups_pending:
+                      type: integer
+                    follow_ups_overdue:
+                      type: integer
+                    follow_ups_due_soon:
+                      type: integer
+                    communications_last_7_days:
+                      type: integer
+                clients_by_status:
+                  type: object
+                  additionalProperties:
+                    type: integer
+                top_sales_reps:
+                  type: array
+                  description: Top 5 sales reps by active client count (v1.1)
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      email:
+                        type: string
+                      active_clients_count:
+                        type: integer
+                avg_communication_frequency_days:
+                  type: number
+                  format: float
+                  nullable: true
+                  description: Average days between communications per client (v1.1)
+                generated_at:
+                  type: string
+                  format: date-time
+    paths:
+      /api/v1/dashboard:
+        get:
+          tags: [Dashboard]
+          summary: Retrieve cached dashboard metrics for the authenticated user.
+          description: |
+            Returns comprehensive dashboard metrics including client counts, follow-ups, 
+            top sales reps, and communication frequency analysis.
+            
+            **New in v1.1:**
+            - top_sales_reps: Top 5 sales reps by active client count
+            - avg_communication_frequency_days: Average days between communications
+          security:
+            - BearerAuth: []
+          responses:
+            '200':
+              description: Dashboard metrics
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/DashboardResponse'
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+        manager_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

@@ -1,0 +1,51 @@
+```mermaid
+erDiagram
+    USER {
+        uuid id
+        string name
+        string email
+        string password
+        string role
+        uuid manager_id
+        timestamps timestamps
+    }
+
+    CLIENT {
+        uuid id
+        string name
+        string email
+        string phone
+        string company
+        string status
+        uuid assigned_to
+        datetime last_contacted_at
+        timestamps timestamps
+    }
+
+    COMMUNICATION {
+        uuid id
+        uuid client_id
+        uuid created_by
+        enum type
+        datetime date
+        text notes
+        timestamps timestamps
+    }
+
+    FOLLOW_UP {
+        uuid id
+        uuid client_id
+        uuid user_id
+        datetime due_date
+        text notes
+        enum status
+        timestamps timestamps
+    }
+
+    USER ||--o{ CLIENT : "assigned" 
+    USER ||--o{ FOLLOW_UP : "owns"
+    USER ||--o{ COMMUNICATION : "creates"
+    CLIENT ||--o{ COMMUNICATION : "logs"
+    CLIENT ||--o{ FOLLOW_UP : "has"
+    USER ||--|{ USER : "manages"
+```
